@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth import authenticate, login
 from django.http import JsonResponse
+from django.middleware.csrf import get_token
+from django.views.decorators.csrf import csrf_exempt
 
 # Create your views here.
 
@@ -20,7 +22,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet) :
     queryset = Utilisateur.objects.all()
     serializer_class = UtilisateurSerializer
 
-    def list(request,self, pk) :
+    def list(self,request) :
 
         """
             -- Cette méthode gère la récupération de la liste des utilisateurs existants. 
@@ -30,7 +32,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet) :
         serializer = self.serializer_class(queryset, many=True)
         return Response(serializer.data)
 
-    def create(request,self):
+    def create(self,request):
         """
             -- Cette méthode gère la création d'un nouvel utilisateur. 
             -- Elle reçoit les données du nouvel utilisateur dans le corps de la requête 
@@ -42,7 +44,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet) :
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def retrieve(self,request,pk=None) : 
+    def retrieve(self,pk=None) : 
 
         """
             -- Cette méthode gère la récupération d'un utilisateur spécifique en utilisant 
@@ -79,15 +81,17 @@ class UtilisateurViewSet(viewsets.ModelViewSet) :
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    def destroy(self,request,pk):
+    
+    def destroy(self,request,pk=None):
 
         """
             --  Cette méthode gère la suppression d'un utilisateur existant identifié par sa clé primaire (pk). 
             -- Elle supprime l'objet Utilisateur correspondant de la base de données.
         """
-        utilisateur = self.get_object(pk=None)
+        utilisateur = self.get_object(pk=pk)
         utilisateur.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
 def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
@@ -96,8 +100,13 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request,user)
-            return JsonResponse({'message': 'Connexion réussie'})
+            csrf_token = get_token(request) # nous avons utilisé la fonction get_token du module django.middleware.csrf
+            return JsonResponse({'csrf_token': csrf_token, 'message': 'Connexion réussie'})   #pour obtenir le jeton CSRF à renvoyer dans la réponse JSON. Le jeton CSRF sera accessible dans la clé csrf_token de la réponse JSON retournée.
         else:
             return JsonResponse({'message': 'Nom d\'utilisateur ou mot de passe incorrect'})
     else :
         return JsonResponse({'message': 'Méthode non autorisée'})
+
+@csrf_exempt
+def csrf_token_view(request):
+    return JsonResponse({'csrfToken': get_token(request)})
